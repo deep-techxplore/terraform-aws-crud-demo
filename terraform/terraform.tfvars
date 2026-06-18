@@ -14,6 +14,7 @@ bucket_name = "terraform-demo-document-bucket"
 
 db_name     = "document_db"
 db_username = "postgres"
+db_password = "QTRyw*9aoAUOSyui()*xio"
 
 # ----- Elastic Beanstalk -----
 
