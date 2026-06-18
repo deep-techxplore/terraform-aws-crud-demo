@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: curd
+
+  # All connection details come from environment variables that Terraform injects
+  # into the Elastic Beanstalk environment (DB_URL / DB_USERNAME / DB_PASSWORD).
+  # The :defaults after each placeholder are ONLY used for local development, so a
+  # developer can run the app with no env vars against a localhost Postgres.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/document_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:root}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+
+# Elastic Beanstalk's Java SE platform proxies requests to the app on port 5000
+# (it sets SERVER_PORT/PORT). Locally we fall back to 8080.
+server:
+  port: ${SERVER_PORT:8080}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# ===========================================================================
+# Application configuration (app.*) — also fully env-var driven.
+# ===========================================================================
+app:
+  # File storage backend. In the cloud Terraform injects STORAGE_PROVIDER=s3;
+  # locally it defaults to on-disk storage so no AWS access is needed.
+  storage:
+    provider: ${STORAGE_PROVIDER:local}
+    local:
+      directory: ${STORAGE_LOCAL_DIR:D:/document-storage}
+      folder: document
+    s3:
+      bucket: ${S3_BUCKET_NAME:document-bucket-local}
+      folder: document
+  aws:
+    # Region only — credentials are NEVER configured here. On Elastic Beanstalk
+    # the app uses the EC2 instance profile (default AWS credential chain); for
+    # local S3 testing the SDK falls back to ~/.aws or AWS_ACCESS_KEY_ID/SECRET.
+    region: ${AWS_REGION:ap-south-1}
+
+logging:
+  level:
+    com.terraform.curd: INFO

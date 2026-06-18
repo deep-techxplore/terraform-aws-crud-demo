@@ -1,0 +1,75 @@
+name: Deploy (Terraform + Spring Boot to Elastic Beanstalk)
+
+# STEP 1 — every push to main triggers the full pipeline.
+# (workflow_dispatch lets you run it manually from the Actions tab too.)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  TF_IN_AUTOMATION: "true"
+  # Terraform reads the RDS master password from this env var (TF_VAR_<name>
+  # maps to var.db_password). Kept as a GitHub secret, never in the repo.
+  TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Corretto)
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: "17"
+          cache: maven
+
+      # STEP 7 — build the Spring Boot jar. Tests are skipped in CI because
+      # CurdApplicationTests loads the full context and needs a reachable DB.
+      # Output: curd/target/curd.jar (pom finalName=curd).
+      - name: Build Spring Boot jar
+        run: mvn -B -f curd/pom.xml clean package -DskipTests
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.5"
+
+      # STEP 2 — init / validate / plan / apply. Terraform runs in terraform/,
+      # so the default app_jar_path (../curd/target/curd.jar) resolves to the
+      # jar built above. Apply does STEP 3-5 (infra + env vars) and STEP 8-10
+      # (upload jar, register version, update environment); EB then rolls it out
+      # (STEP 11).
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Show outputs
+        working-directory: terraform
+        run: terraform output
