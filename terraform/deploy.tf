@@ -21,7 +21,9 @@ locals {
 # STEP 8 — upload the jar. The hash is in the key so each distinct build is a
 # distinct, immutable object (and old ones remain for rollback via versioning).
 resource "aws_s3_object" "app_jar" {
-  bucket = aws_s3_bucket.artifacts.id
+  # Artifacts bucket is commented out; store the deploy jar in the documents
+  # bucket under an app-versions/ prefix instead.
+  bucket = aws_s3_bucket.documents.id
   key    = "app-versions/curd-${local.app_jar_hash}.jar"
   source = var.app_jar_path
 

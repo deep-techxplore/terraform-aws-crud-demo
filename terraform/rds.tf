@@ -12,6 +12,12 @@
 # Only acceptable for a throwaway demo. Do NOT use these settings in production.
 
 resource "aws_db_instance" "postgres" {
+  # Friendly, stable instance identifier instead of the auto-generated
+  # "terraform-2026...". NOTE: RDS identifiers allow only lowercase letters,
+  # digits, and hyphens — underscores are NOT allowed — so the requested
+  # "document_db_terraform" is expressed with hyphens.
+  identifier = "document-db-terraform"
+
   # ----- Engine -----
   engine = "postgres" # PostgreSQL
   # Pin only the MAJOR version ("16"), not a full major.minor like "16.4".

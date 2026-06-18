@@ -60,15 +60,14 @@ resource "aws_iam_role_policy_attachment" "eb_ec2_docker" {
   policy_arn = "arn:aws:iam::aws:policy/AWSElasticBeanstalkMulticontainerDocker"
 }
 
-# Least-privilege S3 access for the instances:
-#   - read/write the documents bucket (the app stores uploads there), and
-#   - read the artifacts bucket (EB downloads the deploy jar from there).
-# All without static AWS keys — the role IS the credential.
+# Least-privilege S3 access for the instances. The app stores uploads in the
+# documents bucket AND the deploy jar now lives there too (under app-versions/),
+# so read/write on the documents bucket covers both. All without static AWS keys.
 data "aws_iam_policy_document" "eb_ec2_s3" {
   statement {
     sid       = "ListBuckets"
     actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
-    resources = [aws_s3_bucket.documents.arn, aws_s3_bucket.artifacts.arn]
+    resources = [aws_s3_bucket.documents.arn]
   }
   statement {
     sid = "ReadWriteDocumentObjects"
@@ -78,11 +77,6 @@ data "aws_iam_policy_document" "eb_ec2_s3" {
       "s3:DeleteObject",
     ]
     resources = ["${aws_s3_bucket.documents.arn}/*"]
-  }
-  statement {
-    sid       = "ReadDeployArtifacts"
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.artifacts.arn}/*"]
   }
 }
 

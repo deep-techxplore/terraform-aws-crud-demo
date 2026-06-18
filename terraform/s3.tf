@@ -1,8 +1,3 @@
-# s3.tf
-# Creates the S3 bucket that the Spring Boot app uses for document/file uploads,
-# and turns on object versioning so overwritten/deleted objects can be recovered.
-
-# The bucket itself. Name is driven by a variable (must be globally unique).
 resource "aws_s3_bucket" "documents" {
   bucket = var.bucket_name
 
@@ -19,55 +14,45 @@ resource "aws_s3_bucket" "documents" {
   }
 }
 
-# Bucket versioning is configured as a SEPARATE resource in AWS provider v5
-# (the old inline `versioning {}` block is deprecated).
-# "Enabled" keeps a full history of every object version.
-resource "aws_s3_bucket_versioning" "documents" {
-  bucket = aws_s3_bucket.documents.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
+# Versioning on the documents bucket is DISABLED (commented out per request).
+# resource "aws_s3_bucket_versioning" "documents" {
+#   bucket = aws_s3_bucket.documents.id
+#
+#   versioning_configuration {
+#     status = "Enabled"
+#   }
+# }
 
 # ---------------------------------------------------------------------------
-# DEPLOYMENT ARTIFACTS BUCKET (CI/CD)
+# DEPLOYMENT ARTIFACTS BUCKET (CI/CD) — COMMENTED OUT
 # ---------------------------------------------------------------------------
-# A SEPARATE bucket for the Elastic Beanstalk application-version jars. Kept
-# apart from the documents bucket on purpose: artifacts have different access
-# (read-only to the instances, written by CI), a different lifecycle, and you
-# never want deploy bundles mixed with user-uploaded documents.
-resource "aws_s3_bucket" "artifacts" {
-  bucket = "${var.bucket_name}-artifacts"
-
-  # Same as the documents bucket: allow destroy to clear the deploy jars.
-  force_destroy = true
-
-  tags = {
-    Name        = "${var.bucket_name}-artifacts"
-    Project     = "terraform-crud-demo"
-    Environment = "demo"
-    ManagedBy   = "terraform"
-  }
-}
-
-# Versioning keeps every uploaded jar, so you can roll back to a previous
-# application version if a deploy goes bad.
-resource "aws_s3_bucket_versioning" "artifacts" {
-  bucket = aws_s3_bucket.artifacts.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# Artifacts are private — only the EB instance role reads them. Block all public
-# access explicitly (artifacts must never be internet-reachable).
-resource "aws_s3_bucket_public_access_block" "artifacts" {
-  bucket = aws_s3_bucket.artifacts.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
+# Disabled per request. The deploy jar is now stored in the documents bucket
+# instead (see aws_s3_object.app_jar in deploy.tf, which points at
+# aws_s3_bucket.documents). To re-enable a separate artifacts bucket, uncomment
+# this block and repoint deploy.tf / iam.tf / outputs.tf back to it.
+#
+# resource "aws_s3_bucket" "artifacts" {
+#   bucket        = "${var.bucket_name}-artifacts"
+#   force_destroy = true
+#   tags = {
+#     Name        = "${var.bucket_name}-artifacts"
+#     Project     = "terraform-crud-demo"
+#     Environment = "demo"
+#     ManagedBy   = "terraform"
+#   }
+# }
+#
+# resource "aws_s3_bucket_versioning" "artifacts" {
+#   bucket = aws_s3_bucket.artifacts.id
+#   versioning_configuration {
+#     status = "Enabled"
+#   }
+# }
+#
+# resource "aws_s3_bucket_public_access_block" "artifacts" {
+#   bucket                  = aws_s3_bucket.artifacts.id
+#   block_public_acls       = true
+#   block_public_policy     = true
+#   ignore_public_acls      = true
+#   restrict_public_buckets = true
+# }

@@ -82,11 +82,11 @@ output "eb_environment_name" {
 
 # ----- CI/CD deployment -----
 
-# Bucket holding the deploy jars (application-version artifacts).
-output "artifacts_bucket_name" {
-  description = "Name of the S3 bucket holding Elastic Beanstalk deploy artifacts"
-  value       = aws_s3_bucket.artifacts.bucket
-}
+# Artifacts bucket commented out — deploy jars now live in the documents bucket.
+# output "artifacts_bucket_name" {
+#   description = "Name of the S3 bucket holding Elastic Beanstalk deploy artifacts"
+#   value       = aws_s3_bucket.artifacts.bucket
+# }
 
 # The application version currently deployed — its name embeds the jar's md5,
 # so it changes only when the code/artifact changes.
