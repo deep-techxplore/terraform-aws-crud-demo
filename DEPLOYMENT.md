@@ -79,24 +79,50 @@ Terraform state records the current `aws_elastic_beanstalk_application_version`
 hash ⇒ Terraform sees no diff. New code ⇒ new hash ⇒ new resource ⇒ EB updated.
 Old versions remain in the versioned artifacts bucket for rollback.
 
-## ⚠️ State backend caveat (you chose local state)
+## Remote state (S3 backend) — required for CI
 
-Local `terraform.tfstate` lives on the machine that runs `terraform`. On
-**GitHub-hosted** runners the workspace is ephemeral, so the pipeline would start
-with empty state and try to recreate everything. To use the GitHub Actions
-workflow for real, do one of:
+State is stored in S3 (see the `backend "s3"` block in `terraform/versions.tf`)
+so it's durable and shared across every run — your laptop AND the ephemeral CI
+runner. A DynamoDB table provides locking. This is what makes re-runs idempotent
+and lets you `terraform destroy` from anywhere.
 
-1. **Recommended:** switch to an S3 backend (durable, shared). Add to `versions.tf`:
-   ```hcl
-   terraform {
-     backend "s3" {
-       bucket = "<your-tf-state-bucket>"
-       key    = "curd/terraform.tfstate"
-       region = "ap-south-1"
-       # dynamodb_table = "<lock-table>"   # optional locking
-     }
-   }
-   ```
-   (create that bucket once, then `terraform init -migrate-state`).
-2. Use a **self-hosted runner** with a persistent working directory.
-3. Otherwise run Terraform **from your machine** (the workflow is then a reference).
+### CI creates the backend automatically
+The deploy workflow has an **"Ensure remote state backend exists"** step that
+creates the state bucket + lock table only if they're missing (idempotent). So for
+CI you do **not** need to run anything by hand — just set the secrets and push.
+This runs once effectively; on later pushes the resources already exist and it's a no-op.
+
+### Manual bootstrap (only if you want to run Terraform LOCALLY first)
+If you'd rather create the backend yourself / run locally before any CI push, use
+the `bootstrap/` folder:
+```powershell
+cd bootstrap
+terraform init
+terraform apply                 # creates terraform-crud-demo-tfstate-* + -locks
+
+cd ../terraform
+terraform init -migrate-state   # answer 'yes' to move state into S3
+```
+
+### Note: the backend survives `terraform destroy`
+`terraform destroy` removes the **stack** (buckets/RDS/EB/IAM), not the state
+bucket or lock table (those belong to `bootstrap/`). So you never re-bootstrap
+after a destroy — just push/apply again to recreate.
+
+## Tearing down the stack
+
+Removes ONLY this config's resources (the `terraform-crud-demo` stack). Production
+isn't in this state, so it can't be affected. Two ways:
+
+- **Locally:**
+  ```powershell
+  cd terraform
+  $env:TF_VAR_db_password = "<same as RDS>"
+  terraform init
+  terraform destroy             # review the list, then 'yes'
+  ```
+- **From GitHub:** Actions → **Destroy (terraform-crud-demo stack)** → Run workflow →
+  type `destroy` to confirm.
+
+`force_destroy = true` on the buckets lets destroy empty them automatically, and
+the `filemd5` hash is guarded with `fileexists()` so destroy works without a built jar.

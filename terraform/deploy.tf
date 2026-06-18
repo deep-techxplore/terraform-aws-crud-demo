@@ -11,7 +11,11 @@ locals {
   # changes, which is the key to "Terraform knows which version is latest":
   #   - same code  -> same hash -> same object key + version name -> NO redeploy
   #   - new code   -> new hash  -> new object key + version name  -> redeploy
-  app_jar_hash = filemd5(var.app_jar_path)
+  #
+  # Guarded with fileexists() so `terraform destroy` still evaluates even when the
+  # jar isn't built (destroy deletes from state and doesn't need the file). During
+  # a real apply the CI/local build always produces the jar, so the true hash is used.
+  app_jar_hash = fileexists(var.app_jar_path) ? filemd5(var.app_jar_path) : "absent"
 }
 
 # STEP 8 — upload the jar. The hash is in the key so each distinct build is a

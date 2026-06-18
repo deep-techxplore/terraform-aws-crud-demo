@@ -6,6 +6,10 @@
 resource "aws_s3_bucket" "documents" {
   bucket = var.bucket_name
 
+  # Let `terraform destroy` empty + delete the bucket even if it still holds
+  # objects/versions (otherwise destroy errors on a non-empty versioned bucket).
+  force_destroy = true
+
   # Tags help identify and group resources in the AWS console / billing.
   tags = {
     Name        = var.bucket_name
@@ -35,6 +39,9 @@ resource "aws_s3_bucket_versioning" "documents" {
 # never want deploy bundles mixed with user-uploaded documents.
 resource "aws_s3_bucket" "artifacts" {
   bucket = "${var.bucket_name}-artifacts"
+
+  # Same as the documents bucket: allow destroy to clear the deploy jars.
+  force_destroy = true
 
   tags = {
     Name        = "${var.bucket_name}-artifacts"
