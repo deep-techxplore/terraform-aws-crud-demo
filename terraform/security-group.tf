@@ -1,20 +1,17 @@
 resource "aws_security_group" "postgres" {
   name        = "${var.db_name}-postgres-sg"
-  description = "Allows PostgreSQL access to the RDS instance from within the VPC"
+  description = "DEMO ONLY - allows public PostgreSQL access to the RDS instance"
 
-  # Created inside the dedicated VPC (vpc.tf) so this SG and the RDS instance live
-  # in the same network.
-  vpc_id = aws_vpc.main.id
+  # No vpc_id is specified, so this security group is created in the account's
+  # DEFAULT VPC — the same place the RDS instance lands in this simple demo.
 
-  # ----- Inbound: PostgreSQL from inside the VPC only -----
-  # Restricted to the VPC CIDR, so only resources in this VPC (the EB instances)
-  # can reach 5432 — no longer open to the internet.
+  # ----- Inbound: PostgreSQL from anywhere (DEMO ONLY) -----
   ingress {
-    description = "PostgreSQL (5432) from within the VPC (EB instances)"
+    description = "PostgreSQL (5432) open to the world - DEMO ONLY, never in prod"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [local.vpc_cidr]
+    cidr_blocks = ["0.0.0.0/0"] # <-- the dangerous, demo-only part
   }
 
   # ----- Outbound: allow all -----

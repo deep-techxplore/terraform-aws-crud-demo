@@ -1,26 +1,20 @@
-# vpc.tf
+# vpc.tf — DISABLED (commented out, kept for future use)
 # =============================================================================
-# Dedicated VPC for the terraform-crud-demo stack.
+# The dedicated VPC below is intentionally COMMENTED OUT. EB and RDS run in the
+# account's DEFAULT VPC as before (rds.tf / security-group.tf / elasticbeanstalk.tf
+# were reverted accordingly).
 #
-# WHY: today the stack lands in the account's DEFAULT VPC (shared with other
-# things). This file creates a brand-new, ISOLATED network so the demo can live
-# entirely on its own. Creating a VPC only ADDS new resources — it cannot touch
-# the default VPC or any production resource in the account.
+# WHY DISABLED: applying it failed with `VpcLimitExceeded` — the region
+# (ap-south-1) is already at the maximum number of VPCs (default 5/region) due to
+# other/prod stacks. To re-enable: raise the "VPCs per Region" service quota
+# (L-F678F1CE), remove the /* ... */ wrapper below, and re-apply the rewiring
+# documented in the NEXT STEPS block.
 #
-# SHAPE (chosen for cheapest practical demo):
-#   - EB instances + ALB  -> PUBLIC subnets (public IPs, reach internet via the
-#     Internet Gateway). No NAT Gateway, so no extra ~$32/mo cost.
-#   - RDS                 -> PRIVATE subnets (no internet route at all), grouped
-#     in a DB subnet group spanning 2 AZs (RDS requires >= 2 AZs).
-#   - Two AZs throughout so the ALB and the RDS subnet group are both valid.
-#
-# SCOPE: this file is STANDALONE networking only. It does NOT yet wire EB or RDS
-# into the new VPC — rds.tf / elasticbeanstalk.tf / security-group.tf are
-# unchanged. See "NEXT STEPS — REWIRING" at the bottom for the exact edits to
-# make once you've reviewed this. Nothing here is applied until you run
-# `terraform plan` / `terraform apply` yourself.
+# Nothing here is active while wrapped in the block comment — Terraform ignores
+# it entirely, so it cannot create any VPC resources or affect any plan/apply.
 # =============================================================================
 
+/*
 locals {
   vpc_name = "terraform-crud-demo-vpc"
 
@@ -148,8 +142,7 @@ resource "aws_route_table_association" "private" {
 # ---------------------------------------------------------------------------
 # 7. DB SUBNET GROUP — where RDS will live (the two private subnets)
 # ---------------------------------------------------------------------------
-# RDS requires a subnet group spanning at least two AZs. This is created now so
-# rds.tf can reference it during the rewire step, but RDS is NOT moved yet.
+# RDS requires a subnet group spanning at least two AZs.
 resource "aws_db_subnet_group" "main" {
   name       = "terraform-crud-demo-db-subnet-group"
   subnet_ids = aws_subnet.private[*].id
@@ -181,23 +174,19 @@ output "db_subnet_group_name" {
 }
 
 # =============================================================================
-# NEXT STEPS — REWIRING (NOT done in this file; review, then say the word)
+# NEXT STEPS — REWIRING (to apply when this VPC is re-enabled)
 # =============================================================================
-# When you're ready to actually move EB + RDS into this VPC, these are the exact
-# edits. ⚠️ Re-confirm before applying: moving RDS REPLACES it (data loss), and
-# rds.tf currently has skip_final_snapshot = true (no backup). I can flip that to
-# false first so a final snapshot is taken.
+# When you re-enable this VPC (after raising the VPC quota), re-apply these edits
+# to put EB + RDS inside it. ⚠️ Re-confirm before applying: moving an EXISTING
+# RDS/EB into a new VPC requires RECREATION (RDS data loss; EB downtime).
 #
 # 1) rds.tf  (aws_db_instance.postgres):
 #      db_subnet_group_name   = aws_db_subnet_group.main.name
 #      publicly_accessible    = false                  # was true
-#      # vpc_security_group_ids already points at aws_security_group.postgres,
-#      # which must move into this VPC (step 2).
 #
 # 2) security-group.tf  (aws_security_group.postgres):
-#      vpc_id = aws_vpc.main.id                        # was implicit default VPC
-#      # tighten ingress: replace cidr_blocks ["0.0.0.0/0"] with
-#      # cidr_blocks = [local.vpc_cidr]  (only in-VPC, i.e. EB, can reach 5432)
+#      vpc_id      = aws_vpc.main.id                   # was implicit default VPC
+#      cidr_blocks = [local.vpc_cidr]                  # was ["0.0.0.0/0"]
 #
 # 3) elasticbeanstalk.tf  (aws_elastic_beanstalk_environment.app) — add settings:
 #      setting { namespace = "aws:ec2:vpc"  name = "VPCId"
@@ -210,6 +199,7 @@ output "db_subnet_group_name" {
 #                value = "true" }
 #      # (ELBScheme is omitted on purpose — EB defaults to an internet-facing ALB.)
 #
-# STATUS: DONE — these edits have been applied to rds.tf / security-group.tf /
-# elasticbeanstalk.tf. This block is kept as a record of the rewiring.
+# STATUS: REVERTED — the rewiring above was rolled back; rds.tf /
+# security-group.tf / elasticbeanstalk.tf are back to the default-VPC setup.
 # =============================================================================
+*/
