@@ -39,14 +39,16 @@ resource "aws_db_instance" "postgres" {
   password = var.db_password # master password (from sensitive variable)
   port     = 5432            # default PostgreSQL port
 
-  # ----- Demo-only networking / availability -----
-  publicly_accessible = true # reachable from the public internet so you can
-  # connect from your laptop — DEMO ONLY, never in prod
-  multi_az = false # single AZ — no standby replica; cheaper, but no HA/failover
+  # ----- Networking / availability -----
+  # Placed in the dedicated VPC's PRIVATE subnets (vpc.tf) via this subnet group,
+  # so the DB has no public endpoint and is reachable only from inside the VPC
+  # (i.e. the Elastic Beanstalk instances).
+  db_subnet_group_name = aws_db_subnet_group.main.name
+  publicly_accessible  = false # private — no public endpoint (was true for laptop access)
+  multi_az             = false # single AZ — no standby replica; cheaper, but no HA/failover
 
-  # Attach the dedicated PostgreSQL security group (defined in security-group.tf).
-  # This is what actually permits inbound TCP 5432. Without it the DB would fall
-  # back to the default VPC security group.
+  # Attach the dedicated PostgreSQL security group (defined in security-group.tf),
+  # which now lives in the same VPC and only permits 5432 from within the VPC CIDR.
   vpc_security_group_ids = [
     aws_security_group.postgres.id
   ]

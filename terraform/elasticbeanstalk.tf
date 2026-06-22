@@ -55,6 +55,31 @@ resource "aws_elastic_beanstalk_environment" "app" {
   # jar and creates the version BEFORE updating the environment.
   version_label = aws_elastic_beanstalk_application_version.app.name
 
+  # ---- Networking: place the environment in the dedicated VPC (vpc.tf) ----
+  # Instances AND the ALB go in the PUBLIC subnets, and instances get public IPs,
+  # so they reach the internet/AWS APIs without a NAT Gateway. The RDS instance
+  # lives in the private subnets and is reached over the VPC's internal routing.
+  setting {
+    namespace = "aws:ec2:vpc"
+    name      = "VPCId"
+    value     = aws_vpc.main.id
+  }
+  setting {
+    namespace = "aws:ec2:vpc"
+    name      = "Subnets"
+    value     = join(",", aws_subnet.public[*].id)
+  }
+  setting {
+    namespace = "aws:ec2:vpc"
+    name      = "ELBSubnets"
+    value     = join(",", aws_subnet.public[*].id)
+  }
+  setting {
+    namespace = "aws:ec2:vpc"
+    name      = "AssociatePublicIpAddress"
+    value     = "true"
+  }
+
   # ---- Instance profile: hand the EC2 role (iam.tf) to the instances ----
   setting {
     namespace = "aws:autoscaling:launchconfiguration"
